@@ -1,3 +1,4 @@
+/* eslint-disable linebreak-style */
 import { series } from 'async';
 import { Server, ServerOptions } from 'socket.io';
 import express from 'express';
