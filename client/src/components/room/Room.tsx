@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { io } from "socket.io-client";
 // const socket = io("http://localhost:8000");
 const socket = io("https://localhost:8443");
@@ -126,6 +126,31 @@ const Room = () => {
     [maybeStart]
   );
 
+  const onCreateSessionDescriptionError = (error: any) => {
+    console.log(`Failed to create session description: ${error.toString()}`);
+    // trace(`Failed to create session description: ${error.toString()}`);
+  };
+
+  const doAnswer = useCallback(() => {
+    console.log("Sending answer to peer.");
+    pc.current
+      .createAnswer()
+      .then((answer: any) => setLocalAndSendMessage(answer))
+      .catch(onCreateSessionDescriptionError);
+  }, [setLocalAndSendMessage]);
+
+  const stop = () => {
+    isStarted.current = false;
+    pc.current.close();
+    pc.current = null;
+  };
+
+  const handleRemoteHangup = useCallback(() => {
+    console.log("Session terminated.");
+    stop();
+    isInitiator.current = false;
+  }, []);
+
   useEffect(() => {
     socket.emit("create or join", "test");
 
@@ -157,24 +182,23 @@ const Room = () => {
       console.log("Client received message:", message);
       if (message === "got user media") {
         maybeStart();
+      } else if (message.type === "offer") {
+        if (!isInitiator.current && !isStarted.current) {
+          maybeStart();
+        }
+        pc.current.setRemoteDescription(new RTCSessionDescription(message));
+        doAnswer();
+      } else if (message.type === "answer" && isStarted) {
+        pc.current.setRemoteDescription(new RTCSessionDescription(message));
+      } else if (message.type === "candidate" && isStarted) {
+        const candidate = new RTCIceCandidate({
+          sdpMLineIndex: message.label,
+          candidate: message.candidate,
+        });
+        pc.current.addIceCandidate(candidate);
+      } else if (message === "bye" && isStarted) {
+        handleRemoteHangup();
       }
-      // else if (message.type === 'offer') {
-      //   if (!isInitiator && !isStarted) {
-      //     maybeStart();
-      //   }
-      //   pc.setRemoteDescription(new RTCSessionDescription(message));
-      //   doAnswer();
-      // } else if (message.type === 'answer' && isStarted) {
-      //   pc.setRemoteDescription(new RTCSessionDescription(message));
-      // } else if (message.type === 'candidate' && isStarted) {
-      //   const candidate = new RTCIceCandidate({
-      //     sdpMLineIndex: message.label,
-      //     candidate: message.candidate,
-      //   });
-      //   pc.addIceCandidate(candidate);
-      // } else if (message === 'bye' && isStarted) {
-      //   handleRemoteHangup();
-      // }
     });
 
     navigator.mediaDevices
@@ -183,7 +207,17 @@ const Room = () => {
       .catch((e) => {
         alert(`getUserMedia() error: ${e.name}`);
       });
-  }, [gotStream, maybeStart]);
+  }, [gotStream, maybeStart, doAnswer, handleRemoteHangup]);
+
+  useEffect(() => {
+    const bye = () => {
+      sendMessage("bye");
+    };
+    window.addEventListener("beforeunload", bye);
+    return () => {
+      window.removeEventListener("beforeunload", bye);
+    };
+  }, []);
 
   const sendMessage = (message: any) => {
     console.log("Client sending message: ", message);
