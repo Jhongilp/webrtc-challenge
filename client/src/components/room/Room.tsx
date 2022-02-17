@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { io } from "socket.io-client";
-// const socket = io("http://localhost:8000");
 const socket = io("https://localhost:8443");
 
 const pcConfig = {
@@ -23,6 +22,9 @@ const constraints = {
 };
 
 const Room = () => {
+  const [isRemotePeerReady, setRemotePeerReady] = useState(false)
+  const [isCallComing, setCallComing] = useState(false)
+
   const localVideoRef = useRef<any>(null);
   const remoteVideoRef = useRef<any>(null);
   const localStreamRef = useRef<any>(null);
@@ -44,7 +46,7 @@ const Room = () => {
   }, []);
 
   const handleIceCandidate = useCallback((event: any) => {
-    console.log("icecandidate event: ", event);
+    // console.log("icecandidate event: ", event);
     if (event.candidate) {
       sendMessage({
         type: "candidate",
@@ -118,7 +120,7 @@ const Room = () => {
       console.log("Adding local stream.");
       localStreamRef.current = stream;
       localVideoRef.current.srcObject = stream;
-      sendMessage("got user media");
+      sendMessage("user_media");
       if (isInitiator.current) {
         maybeStart();
       }
@@ -152,62 +154,79 @@ const Room = () => {
   }, []);
 
   useEffect(() => {
-    socket.emit("create or join", "test");
+    // socket.emit("create or join", "test");
 
-    socket.on("created", (roomObject, socketId) => {
-      console.log(`Created room ${roomObject} - socketId: ${socketId}`);
-      isInitiator.current = true;
+    socket.on("user_media", (data) => {
+      console.log("user_media room - data: ", data);
+      setRemotePeerReady(true);
     });
+    
+    // socket.on("created", (roomObject, socketId) => {
+    //   console.log(`Created room ${roomObject} - socketId: ${socketId}`);
+    //   isInitiator.current = true;
+    // });
 
-    socket.on("full", (roomObject) => {
-      console.log(`Room ${roomObject} is full`);
-    });
+    // socket.on("full", (roomObject) => {
+    //   console.log(`Room ${roomObject} is full`);
+    // });
 
-    socket.on("join", (roomObject) => {
-      console.log(`Another peer made a request to join room ${roomObject}`);
-      console.log(`This peer is the initiator of room ${roomObject}!`);
-      isChannelReady.current = true;
-    });
+    // socket.on("join", (roomObject) => {
+    //   console.log(`Another peer made a request to join room ${roomObject}`);
+    //   console.log(`This peer is the initiator of room ${roomObject}!`);
+    //   isChannelReady.current = true;
+    // });
 
-    socket.on("joined", (roomObject) => {
-      console.log(`joined: ${roomObject}`);
-      isChannelReady.current = true;
-    });
+    // socket.on("joined", (roomObject) => {
+    //   console.log(`joined: ${roomObject}`);
+    //   isChannelReady.current = true;
+    // });
 
-    socket.on("log", (array) => {
-      console.log(...array);
-    });
+    // socket.on("log", (array) => {
+    //   console.log(...array);
+    // });
 
-    socket.on("message", (message) => {
-      console.log("Client received message:", message);
-      if (message === "got user media") {
-        maybeStart();
-      } else if (message.type === "offer") {
-        if (!isInitiator.current && !isStarted.current) {
-          maybeStart();
-        }
-        pc.current.setRemoteDescription(new RTCSessionDescription(message));
-        doAnswer();
-      } else if (message.type === "answer" && isStarted) {
-        pc.current.setRemoteDescription(new RTCSessionDescription(message));
-      } else if (message.type === "candidate" && isStarted) {
-        const candidate = new RTCIceCandidate({
-          sdpMLineIndex: message.label,
-          candidate: message.candidate,
+    // socket.on("message", (message) => {
+    //   console.log("Client received message:", message);
+    //   if (message === "got user media") {
+    //     maybeStart();
+    //   } else if (message.type === "offer") {
+    //     if (!isInitiator.current && !isStarted.current) {
+    //       maybeStart();
+    //     }
+    //     pc.current.setRemoteDescription(new RTCSessionDescription(message));
+    //     doAnswer();
+    //   } else if (message.type === "answer" && isStarted) {
+    //     pc.current.setRemoteDescription(new RTCSessionDescription(message));
+    //   } else if (message.type === "candidate" && isStarted) {
+    //     const candidate = new RTCIceCandidate({
+    //       sdpMLineIndex: message.label,
+    //       candidate: message.candidate,
+    //     });
+    //     pc.current.addIceCandidate(candidate);
+    //   } else if (message === "bye" && isStarted) {
+    //     handleRemoteHangup();
+    //   }
+    // });
+  }, [maybeStart, doAnswer, handleRemoteHangup]);
+
+  useEffect(() => {
+    const getUserMedia = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log("[setupLocalStream] socketId: ", socket.id);
+        localStreamRef.current = stream;
+        localVideoRef.current.srcObject = stream;
+        socket.emit("user_media", {
+          roomId: 'test-room',
+          userId: socket.id
         });
-        pc.current.addIceCandidate(candidate);
-      } else if (message === "bye" && isStarted) {
-        handleRemoteHangup();
+      } catch (error) {
+        // TODO handle this case properly
+        alert(`getUserMedia() error: ${error}`);
       }
-    });
-
-    navigator.mediaDevices
-      .getUserMedia(constraints)
-      .then(gotStream)
-      .catch((e) => {
-        alert(`getUserMedia() error: ${e.name}`);
-      });
-  }, [gotStream, maybeStart, doAnswer, handleRemoteHangup]);
+    };
+    getUserMedia();
+  }, []);
 
   useEffect(() => {
     const bye = () => {
@@ -224,14 +243,34 @@ const Room = () => {
     socket.emit("message", message);
   };
 
+  const handleOnCall = () => {
+    createPeerConnection();
+    pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
+    doCall();
+  };
+
   return (
     <div>
       <div id="videos">
         <video ref={localVideoRef} id="localVideo" autoPlay muted></video>
         <video ref={remoteVideoRef} id="remoteVideo" autoPlay></video>
       </div>
+      <div id="controls">
+        <button type="button" disabled={!isRemotePeerReady} onClick={handleOnCall}>
+          CALL
+        </button>
+        <button type="button" disabled={!isCallComing}>ANSWER</button>
+        <button type="button" disabled>HANGUP</button>
+      </div>
+    <div>
+      <h2>Socket id {socket.id}</h2>
+    </div>
     </div>
   );
 };
 
 export default Room;
+
+/**
+ * 1. get user media
+ */
