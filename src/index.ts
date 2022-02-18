@@ -1,3 +1,4 @@
+/* eslint-disable prefer-destructuring */
 import { series } from "async";
 import { Server, ServerOptions } from "socket.io";
 // import { Socket } from "socket.io";
@@ -49,15 +50,20 @@ const socketSignalingServer = (
       socket.broadcast.emit("message", message);
     });
 
-    socket.on(
-      "user_media",
-      (data: { roomId: string; userId: string }) => {
-        // To support multiple rooms in app, would be room-only (not broadcast)
-        // socket.broadcast.emit("user_media", userSocketId);
-        socket.join(data.roomId);
-        io.sockets.in(data.roomId).emit("user_media", data);
-      }
-    );
+    socket.on("user_media", (data: { roomId: string; userId: string }) => {
+      // To support multiple rooms in app, would be room-only (not broadcast)
+      // socket.broadcast.emit("user_media", userSocketId);
+      socket.join(data.roomId);
+      io.sockets.in(data.roomId).emit("user_media", data);
+    });
+
+    socket.on("call", (data: { roomId: string; userId: string }) => {
+      // To support multiple rooms in app, would be room-only (not broadcast)
+      // socket.broadcast.emit("user_media", userSocketId);
+      // socket.join(data.roomId);
+      // io.sockets.in(data.roomId).emit("call", data);
+      socket.to(data.roomId).emit("call", data);
+    });
 
     socket.on("create or join", (room: string) => {
       log(`Received request to create or join room ${room}`);

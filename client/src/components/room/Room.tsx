@@ -22,8 +22,8 @@ const constraints = {
 };
 
 const Room = () => {
-  const [isRemotePeerReady, setRemotePeerReady] = useState(false)
-  const [isCallComing, setCallComing] = useState(false)
+  const [isRemotePeerReady, setRemotePeerReady] = useState(false);
+  const [isCallComing, setCallComing] = useState(false);
 
   const localVideoRef = useRef<any>(null);
   const remoteVideoRef = useRef<any>(null);
@@ -72,10 +72,6 @@ const Room = () => {
     }
   }, [handleIceCandidate, handleRemoteStreamAdded, handleRemoteStreamRemoved]);
 
-  const handleCreateOfferError = useCallback((event: any) => {
-    console.log("createOffer() error: ", event);
-  }, []);
-
   const setLocalAndSendMessage = useCallback((sessionDescription: any) => {
     // Set Opus as the preferred codec in SDP if Opus is present.
     //  sessionDescription.sdp = preferOpus(sessionDescription.sdp);
@@ -83,14 +79,6 @@ const Room = () => {
     console.log("setLocalAndSendMessage sending message", sessionDescription);
     sendMessage(sessionDescription);
   }, []);
-
-  const doCall = useCallback(() => {
-    console.log("Sending offer to peer");
-    pc.current
-      .createOffer([sdpConstraints])
-      .then((offer: any) => setLocalAndSendMessage(offer))
-      .catch(handleCreateOfferError);
-  }, [setLocalAndSendMessage, handleCreateOfferError]);
 
   const maybeStart = useCallback(() => {
     console.log(
@@ -110,10 +98,11 @@ const Room = () => {
       isStarted.current = true;
       console.log("isInitiator", isInitiator.current);
       if (isInitiator.current) {
-        doCall();
+        // doCall();
       }
     }
-  }, [createPeerConnection, doCall]);
+    // }, [createPeerConnection, doCall]);
+  }, [createPeerConnection]);
 
   const gotStream = useCallback(
     (stream: any) => {
@@ -158,9 +147,25 @@ const Room = () => {
 
     socket.on("user_media", (data) => {
       console.log("user_media room - data: ", data);
-      setRemotePeerReady(true);
+      setRemotePeerReady(data.userId !== socket.id);
     });
-    
+
+    socket.on("call", (data) => {
+      console.log("[on call]: ", data);
+      setCallComing(true)
+    });
+
+    socket.on("message", (message) => {
+      // 1. offer made by call
+      if (message.type === "offer") {
+        console.log("[on message] [offer] ");
+        // if (!isInitiator.current && !isStarted.current) {
+        //   pc.current.setRemoteDescription(new RTCSessionDescription(message));
+        //   doAnswer();
+        // }
+      }
+    });
+
     // socket.on("created", (roomObject, socketId) => {
     //   console.log(`Created room ${roomObject} - socketId: ${socketId}`);
     //   isInitiator.current = true;
@@ -217,8 +222,8 @@ const Room = () => {
         localStreamRef.current = stream;
         localVideoRef.current.srcObject = stream;
         socket.emit("user_media", {
-          roomId: 'test-room',
-          userId: socket.id
+          roomId: "test-room",
+          userId: socket.id,
         });
       } catch (error) {
         // TODO handle this case properly
@@ -243,11 +248,28 @@ const Room = () => {
     socket.emit("message", message);
   };
 
-  const handleOnCall = () => {
-    createPeerConnection();
+  const handleOnCall = async () => {
+    createPeerConnection(); // !right now there is way to call this from callee
     pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
-    doCall();
+    // console.log("Sending offer to peer");
+    console.log("calling");
+    try {
+      const sessionDescription = await pc.current.createOffer([sdpConstraints]);
+      pc.current.setLocalDescription(sessionDescription);
+      // sendMessage(sessionDescription); 
+      socket.emit("call", {
+        roomId: "test-room",
+        userId: socket.id,
+        sessionDescription // TODO pass this to callee
+      });
+    } catch (error) {
+      console.log("createOffer() error: ", error);
+    }
   };
+
+  const handleOnAnswer = () => {
+
+  } 
 
   return (
     <div>
@@ -256,15 +278,25 @@ const Room = () => {
         <video ref={remoteVideoRef} id="remoteVideo" autoPlay></video>
       </div>
       <div id="controls">
-        <button type="button" disabled={!isRemotePeerReady} onClick={handleOnCall}>
+        <button
+          type="button"
+          disabled={!isRemotePeerReady}
+          onClick={handleOnCall}
+        >
           CALL
         </button>
-        <button type="button" disabled={!isCallComing}>ANSWER</button>
-        <button type="button" disabled>HANGUP</button>
+        {isCallComing && (
+          <>
+            <button type="button" onClick={handleOnAnswer}>ANSWER</button>
+            <button type="button" disabled>
+              HANGUP
+            </button>
+          </>
+        )}
       </div>
-    <div>
-      <h2>Socket id {socket.id}</h2>
-    </div>
+      <div>
+        <h2>Socket id {socket.id}</h2>
+      </div>
     </div>
   );
 };
