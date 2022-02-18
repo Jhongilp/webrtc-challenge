@@ -152,7 +152,11 @@ const Room = () => {
 
     socket.on("call", (data) => {
       console.log("[on call]: ", data);
-      setCallComing(true)
+
+      // !careful, this works under the condition that this message is received only by the callee, not the caller
+      // TODO what is we SET setRemoteDescription only when callee answers the call?
+      pc.current.setRemoteDescription(new RTCSessionDescription(data.sessionDescription));
+      setCallComing(true);
     });
 
     socket.on("message", (message) => {
@@ -207,6 +211,7 @@ const Room = () => {
     //       sdpMLineIndex: message.label,
     //       candidate: message.candidate,
     //     });
+    // TODO addIceCandidate
     //     pc.current.addIceCandidate(candidate);
     //   } else if (message === "bye" && isStarted) {
     //     handleRemoteHangup();
@@ -249,27 +254,50 @@ const Room = () => {
   };
 
   const handleOnCall = async () => {
-    createPeerConnection(); // !right now there is way to call this from callee
+    createPeerConnection();
     pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
     // console.log("Sending offer to peer");
     console.log("calling");
     try {
       const sessionDescription = await pc.current.createOffer([sdpConstraints]);
-      pc.current.setLocalDescription(sessionDescription);
-      // sendMessage(sessionDescription); 
-      socket.emit("call", {
-        roomId: "test-room",
-        userId: socket.id,
-        sessionDescription // TODO pass this to callee
-      });
+      pc.current.setLocalDescription(sessionDescription); // this is what triggers onicecandidate
+      // // sendMessage(sessionDescription);
+      // socket.emit("call", {
+      //   roomId: "test-room",
+      //   userId: socket.id,
+      //   sessionDescription, // TODO pass this to callee
+      // });
     } catch (error) {
       console.log("createOffer() error: ", error);
     }
   };
 
-  const handleOnAnswer = () => {
+  const handleOnAnswer = async () => {
+    console.log("Sending answer to peer.");
+    
+    createPeerConnection();
+    pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
 
-  } 
+    try {
+      const sessionDescription = await pc.current.createAnswer();
+
+      pc.current.setLocalDescription(sessionDescription);
+      console.log("setLocalAndSendMessage sending message", sessionDescription);
+      socket.emit("answer", {
+        roomId: "test-room",
+        userId: socket.id,
+        sessionDescription, // TODO pass this to callee
+      });
+
+      // sendMessage(sessionDescription);
+      // pc.current
+      //   .createAnswer()
+      //   .then((answer: any) => setLocalAndSendMessage(answer))
+      //   .catch(onCreateSessionDescriptionError);
+    } catch (error) {
+      console.log("createAnswer() error: ", error);
+    }
+  };
 
   return (
     <div>
@@ -287,7 +315,9 @@ const Room = () => {
         </button>
         {isCallComing && (
           <>
-            <button type="button" onClick={handleOnAnswer}>ANSWER</button>
+            <button type="button" onClick={handleOnAnswer}>
+              ANSWER
+            </button>
             <button type="button" disabled>
               HANGUP
             </button>
