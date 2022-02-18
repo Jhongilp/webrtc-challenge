@@ -65,6 +65,10 @@ const socketSignalingServer = (
       socket.to(data.roomId).emit("call", data);
     });
 
+    socket.on("answer", (data: { roomId: string; userId: string }) => {
+      socket.to(data.roomId).emit("answer", data);
+    });
+
     socket.on("create or join", (room: string) => {
       log(`Received request to create or join room ${room}`);
 

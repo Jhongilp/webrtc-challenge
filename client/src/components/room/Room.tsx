@@ -145,6 +145,7 @@ const Room = () => {
   useEffect(() => {
     // socket.emit("create or join", "test");
 
+    // TODO use join instead
     socket.on("user_media", (data) => {
       console.log("user_media room - data: ", data);
       setRemotePeerReady(data.userId !== socket.id);
@@ -154,19 +155,35 @@ const Room = () => {
       console.log("[on call]: ", data);
 
       // !careful, this works under the condition that this message is received only by the callee, not the caller
-      // TODO what is we SET setRemoteDescription only when callee answers the call?
-      pc.current.setRemoteDescription(new RTCSessionDescription(data.sessionDescription));
+      // TODO what is we setRemoteDescription only when callee answers the call?
+      pc.current.setRemoteDescription(
+        new RTCSessionDescription(data.sessionDescription)
+      );
       setCallComing(true);
+    });
+    
+    socket.on("answer", (data) => {
+      console.log("[on answer]: ", data);
+      pc.current.setRemoteDescription(
+        new RTCSessionDescription(data.sessionDescription)
+      );
+      // setCallComing(false);
     });
 
     socket.on("message", (message) => {
       // 1. offer made by call
       if (message.type === "offer") {
         console.log("[on message] [offer] ");
-        // if (!isInitiator.current && !isStarted.current) {
-        //   pc.current.setRemoteDescription(new RTCSessionDescription(message));
-        //   doAnswer();
-        // }
+      }
+
+      if (message.type === "candidate" && isStarted) {
+        console.log("[on message] [on candidate] ");
+        const candidate = new RTCIceCandidate({
+          sdpMLineIndex: message.label,
+          candidate: message.candidate,
+        });
+        // TODO addIceCandidate
+        pc.current.addIceCandidate(candidate);
       }
     });
 
@@ -226,6 +243,10 @@ const Room = () => {
         console.log("[setupLocalStream] socketId: ", socket.id);
         localStreamRef.current = stream;
         localVideoRef.current.srcObject = stream;
+
+        createPeerConnection();
+        pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
+
         socket.emit("user_media", {
           roomId: "test-room",
           userId: socket.id,
@@ -254,19 +275,19 @@ const Room = () => {
   };
 
   const handleOnCall = async () => {
-    createPeerConnection();
-    pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
+    // createPeerConnection();
+    // pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
     // console.log("Sending offer to peer");
     console.log("calling");
     try {
       const sessionDescription = await pc.current.createOffer([sdpConstraints]);
       pc.current.setLocalDescription(sessionDescription); // this is what triggers onicecandidate
       // // sendMessage(sessionDescription);
-      // socket.emit("call", {
-      //   roomId: "test-room",
-      //   userId: socket.id,
-      //   sessionDescription, // TODO pass this to callee
-      // });
+      socket.emit("call", {
+        roomId: "test-room",
+        userId: socket.id,
+        sessionDescription, // TODO pass this to callee
+      });
     } catch (error) {
       console.log("createOffer() error: ", error);
     }
@@ -274,20 +295,22 @@ const Room = () => {
 
   const handleOnAnswer = async () => {
     console.log("Sending answer to peer.");
-    
-    createPeerConnection();
-    pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
+
+    // createPeerConnection();
+    // pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
 
     try {
       const sessionDescription = await pc.current.createAnswer();
 
       pc.current.setLocalDescription(sessionDescription);
+      
       console.log("setLocalAndSendMessage sending message", sessionDescription);
       socket.emit("answer", {
         roomId: "test-room",
         userId: socket.id,
         sessionDescription, // TODO pass this to callee
       });
+      setCallComing(false);
 
       // sendMessage(sessionDescription);
       // pc.current
