@@ -17,7 +17,7 @@ const sdpConstraints = {
 };
 
 const constraints = {
-  audio: false,
+  audio: true,
   video: true,
 };
 
@@ -28,9 +28,18 @@ type CALL_STATUS =
   | "answered"
   | "hangup";
 
+type TEnumerateDevices = {
+  audio: MediaDeviceInfo[];
+  video: MediaDeviceInfo[];
+};
+
 const Room = () => {
   const [callStatus, updateCallStatus] = useState<CALL_STATUS>("not_started");
   const [isRemotePeerReady, setRemotePeerReady] = useState(false);
+  const [deviceList, setDeviceList] = useState<TEnumerateDevices>({
+    audio: [],
+    video: [],
+  });
 
   const localVideoRef = useRef<any>(null);
   const remoteVideoRef = useRef<any>(null);
@@ -149,6 +158,25 @@ const Room = () => {
         localStreamRef.current = stream;
         localVideoRef.current.srcObject = stream;
 
+        navigator.mediaDevices
+          .enumerateDevices()
+          .then(function (devices) {
+            console.log("device LIST: ", devices);
+            const audioDeviceList = devices.filter(
+              (device) => device.kind === "audioinput"
+            );
+            const videoDeviceList = devices.filter(
+              (device) => device.kind === "videoinput"
+            );
+            setDeviceList({
+              audio: audioDeviceList,
+              video: videoDeviceList,
+            });
+          })
+          .catch(function (err) {
+            console.log(err.name + ": " + err.message);
+          });
+
         socket.emit("user_media", {
           roomId: "test-room",
           userId: socket.id,
@@ -220,12 +248,34 @@ const Room = () => {
     }
   };
 
+  const handleOnAudioDeviceSelected = (e: any) => {
+    console.log("on mic change: ", e.currentTarget.value)
+  };
+
   const isCalling = callStatus === "calling";
   const isCallComing = callStatus === "call_coming";
   const isCallStablished = callStatus === "answered";
 
   return (
     <div>
+      <div id="media-controls">
+        <div>
+          <label>Camara</label>
+          <select>
+            {deviceList.video.map((device) => {
+              return <option>{device.label}</option>;
+            })}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="mic-list">Mic</label>
+          <select onChange={handleOnAudioDeviceSelected} id="mic-list">
+            {deviceList.audio.map((device) => {
+              return <option value={device.label}>{device.label}</option>;
+            })}
+          </select>
+        </div>
+      </div>
       <div id="videos">
         <video ref={localVideoRef} id="localVideo" autoPlay muted></video>
         <video ref={remoteVideoRef} id="remoteVideo" autoPlay></video>
