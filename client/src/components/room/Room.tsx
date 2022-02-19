@@ -33,6 +33,23 @@ type TEnumerateDevices = {
   video: MediaDeviceInfo[];
 };
 
+type TDeviceSelectionChange = {
+  type: "audio" | "video";
+  selectedMedia: MediaDeviceInfo;
+};
+
+const getUpdatedStream = async ({
+  type,
+  selectedMedia,
+}: TDeviceSelectionChange) => {
+  const newConstraints = {
+    ...constraints,
+    [type]: { deviceId: { exact: selectedMedia.deviceId } },
+  };
+  const stream = await navigator.mediaDevices.getUserMedia(newConstraints);
+  return stream;
+};
+
 const Room = () => {
   const [callStatus, updateCallStatus] = useState<CALL_STATUS>("not_started");
   const [isRemotePeerReady, setRemotePeerReady] = useState(false);
@@ -40,8 +57,6 @@ const Room = () => {
     audio: [],
     video: [],
   });
-  const [selectedAudioDevice, setSelectedAudioDevice] =
-    useState<MediaDeviceInfo | null>(null);
 
   const localVideoRef = useRef<any>(null);
   const remoteVideoRef = useRef<any>(null);
@@ -74,6 +89,9 @@ const Room = () => {
       pc.current.connectionState
     );
   }, []);
+  const handleOnTrackEvents = useCallback((event: any) => {
+    console.log("[pc connection] on track event: ", event);
+  }, []);
 
   const createPeerConnection = useCallback(() => {
     try {
@@ -81,6 +99,7 @@ const Room = () => {
       pc.current.onicecandidate = handleIceCandidate;
       pc.current.onaddstream = handleRemoteStreamAdded;
       pc.current.onconnectionstatechange = handleConnectionStateChange;
+      pc.current.ontrack = handleOnTrackEvents;
       console.log("Created RTCPeerConnnection");
     } catch (e: any) {
       console.log(`Failed to create PeerConnection, exception: ${e.message}`);
@@ -90,6 +109,7 @@ const Room = () => {
     handleIceCandidate,
     handleRemoteStreamAdded,
     handleConnectionStateChange,
+    handleOnTrackEvents,
   ]);
 
   useEffect(() => {
@@ -250,16 +270,48 @@ const Room = () => {
     }
   };
 
-  const handleOnAudioDeviceSelected = (e: any) => {
-    console.log("on mic change: ", e.target.value);
+  const stopCurrentTracks = () => {
+    localStreamRef.current.getTracks().forEach((track: any) => {
+      track.stop();
+    });
+  };
+
+  const handleOnDeviceSelectionChange = async ({
+    type,
+    selectedMedia,
+  }: TDeviceSelectionChange) => {
+    stopCurrentTracks();
+    const stream = await getUpdatedStream({ type, selectedMedia });
+    localStreamRef.current = stream;
+    localVideoRef.current.srcObject = stream;
+    console.log("[stream tracks] ", stream.getTracks());
+    stream.getTracks().forEach((track) => pc.current.addTrack(track, stream));
+  };
+
+  const handleOnAudioDeviceSelected = async (e: any) => {
     const selectedMic = deviceList.audio.find(
       (device) => device.deviceId === e.currentTarget.value
     );
     if (selectedMic) {
-      setSelectedAudioDevice(selectedMic);
-      
+      console.log("on mic change device selected: ", selectedMic);
+      handleOnDeviceSelectionChange({
+        type: "audio",
+        selectedMedia: selectedMic,
+      });
     }
-    console.log("on mic change device selected: ", selectedMic);
+  };
+
+  const handleOnVideoDeviceSelected = async (e: any) => {
+    const selectedCamera = deviceList.video.find(
+      (device) => device.deviceId === e.currentTarget.value
+    );
+    if (selectedCamera) {
+      console.log("on video change device selected: ", selectedCamera);
+      handleOnDeviceSelectionChange({
+        type: "video",
+        selectedMedia: selectedCamera,
+      });
+    }
   };
 
   const isCalling = callStatus === "calling";
@@ -270,10 +322,14 @@ const Room = () => {
     <div>
       <div id="media-controls">
         <div>
-          <label>Camara</label>
-          <select>
+          <label htmlFor="camera-list">Camera</label>
+          <select onChange={handleOnVideoDeviceSelected} id="camera-list">
             {deviceList.video.map((device) => {
-              return <option key={device.deviceId}>{device.label}</option>;
+              return (
+                <option value={device.deviceId} key={device.deviceId}>
+                  {device.label}
+                </option>
+              );
             })}
           </select>
         </div>
