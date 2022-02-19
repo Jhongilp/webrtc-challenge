@@ -40,6 +40,8 @@ const Room = () => {
     audio: [],
     video: [],
   });
+  const [selectedAudioDevice, setSelectedAudioDevice] =
+    useState<MediaDeviceInfo | null>(null);
 
   const localVideoRef = useRef<any>(null);
   const remoteVideoRef = useRef<any>(null);
@@ -249,7 +251,15 @@ const Room = () => {
   };
 
   const handleOnAudioDeviceSelected = (e: any) => {
-    console.log("on mic change: ", e.currentTarget.value)
+    console.log("on mic change: ", e.target.value);
+    const selectedMic = deviceList.audio.find(
+      (device) => device.deviceId === e.currentTarget.value
+    );
+    if (selectedMic) {
+      setSelectedAudioDevice(selectedMic);
+      
+    }
+    console.log("on mic change device selected: ", selectedMic);
   };
 
   const isCalling = callStatus === "calling";
@@ -263,7 +273,7 @@ const Room = () => {
           <label>Camara</label>
           <select>
             {deviceList.video.map((device) => {
-              return <option>{device.label}</option>;
+              return <option key={device.deviceId}>{device.label}</option>;
             })}
           </select>
         </div>
@@ -271,7 +281,15 @@ const Room = () => {
           <label htmlFor="mic-list">Mic</label>
           <select onChange={handleOnAudioDeviceSelected} id="mic-list">
             {deviceList.audio.map((device) => {
-              return <option value={device.label}>{device.label}</option>;
+              return (
+                <option
+                  defaultValue="default"
+                  value={device.deviceId}
+                  key={device.deviceId}
+                >
+                  {device.label}
+                </option>
+              );
             })}
           </select>
         </div>
