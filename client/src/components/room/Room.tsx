@@ -21,17 +21,21 @@ const constraints = {
   video: true,
 };
 
+type CALL_STATUS =
+  | "not_started"
+  | "calling"
+  | "call_coming"
+  | "answered"
+  | "hangup";
+
 const Room = () => {
+  const [callStatus, updateCallStatus] = useState<CALL_STATUS>("not_started");
   const [isRemotePeerReady, setRemotePeerReady] = useState(false);
-  const [isCallComing, setCallComing] = useState(false);
 
   const localVideoRef = useRef<any>(null);
   const remoteVideoRef = useRef<any>(null);
   const localStreamRef = useRef<any>(null);
   const remoteStreamRef = useRef<any>(null);
-
-  const isInitiator = useRef(false);
-  const isStarted = useRef(false);
   const pc = useRef<any>(null);
 
   const handleRemoteStreamAdded = useCallback((event: any) => {
@@ -40,12 +44,7 @@ const Room = () => {
     remoteVideoRef.current.srcObject = remoteStreamRef.current;
   }, []);
 
-  const handleRemoteStreamRemoved = useCallback((event: any) => {
-    console.log("Remote stream removed. Event: ", event);
-  }, []);
-
   const handleIceCandidate = useCallback((event: any) => {
-    // console.log("icecandidate event: ", event);
     if (event.candidate) {
       sendMessage({
         type: "candidate",
@@ -63,25 +62,12 @@ const Room = () => {
       pc.current = new RTCPeerConnection(pcConfig);
       pc.current.onicecandidate = handleIceCandidate;
       pc.current.onaddstream = handleRemoteStreamAdded;
-      pc.current.onremovestream = handleRemoteStreamRemoved;
       console.log("Created RTCPeerConnnection");
     } catch (e: any) {
       console.log(`Failed to create PeerConnection, exception: ${e.message}`);
       alert("Cannot create RTCPeerConnection object.");
     }
-  }, [handleIceCandidate, handleRemoteStreamAdded, handleRemoteStreamRemoved]);
-
-  const stop = () => {
-    isStarted.current = false;
-    pc.current.close();
-    pc.current = null;
-  };
-
-  const handleRemoteHangup = useCallback(() => {
-    console.log("Session terminated.");
-    stop();
-    isInitiator.current = false;
-  }, []);
+  }, [handleIceCandidate, handleRemoteStreamAdded]);
 
   useEffect(() => {
     // socket.emit("create or join", "test");
@@ -100,7 +86,7 @@ const Room = () => {
       pc.current.setRemoteDescription(
         new RTCSessionDescription(data.sessionDescription)
       );
-      setCallComing(true);
+      updateCallStatus("call_coming");
     });
 
     socket.on("answer", (data) => {
@@ -108,7 +94,7 @@ const Room = () => {
       pc.current.setRemoteDescription(
         new RTCSessionDescription(data.sessionDescription)
       );
-      // setCallComing(false);
+      updateCallStatus("answered");
     });
 
     socket.on("message", (message) => {
@@ -117,27 +103,26 @@ const Room = () => {
         console.log("[on message] [offer] ");
       }
 
-      if (message.type === "candidate" && isStarted) {
-        console.log("[on message] [on candidate] ");
+      if (message.type === "candidate") {
+        // console.log("[on message] [on candidate] ");
         const candidate = new RTCIceCandidate({
           sdpMLineIndex: message.label,
           candidate: message.candidate,
         });
-        // TODO addIceCandidate
         pc.current.addIceCandidate(candidate);
       }
-    });
 
+      if (message.type === "hangup") {
+        console.log("[on message] [on hangup] ");
+        updateCallStatus("hangup");
+      }
+    });
 
     // socket.on("full", (roomObject) => {
     //   console.log(`Room ${roomObject} is full`);
     // });
-    // socket.on("message", (message) => { 
-    // if (message === "bye" && isStarted) {
-    //     handleRemoteHangup();
-    //   }
-    // });
-  }, [handleRemoteHangup]);
+    // socket.on("message", (message) => {
+  }, []);
 
   useEffect(() => {
     const getUserMedia = async () => {
@@ -160,17 +145,24 @@ const Room = () => {
       }
     };
     getUserMedia();
+  }, [createPeerConnection]);
+
+  const handleOnHangup = useCallback(() => {
+    sendMessage({
+      type: "hangup",
+      roomId: "test-room",
+      userId: socket.id,
+    });
+    pc.current.close();
+    pc.current = null;
   }, []);
 
   useEffect(() => {
-    const bye = () => {
-      sendMessage("bye");
-    };
-    window.addEventListener("beforeunload", bye);
+    window.addEventListener("beforeunload", handleOnHangup);
     return () => {
-      window.removeEventListener("beforeunload", bye);
+      window.removeEventListener("beforeunload", handleOnHangup);
     };
-  }, []);
+  }, [handleOnHangup]);
 
   const sendMessage = (message: any) => {
     console.log("Client sending message: ", message);
@@ -179,6 +171,7 @@ const Room = () => {
 
   const handleOnCall = async () => {
     console.log("calling");
+    updateCallStatus("calling");
     try {
       const sessionDescription = await pc.current.createOffer([sdpConstraints]);
       pc.current.setLocalDescription(sessionDescription); // this is what triggers onicecandidate
@@ -190,6 +183,7 @@ const Room = () => {
       });
     } catch (error) {
       console.log("createOffer() error: ", error);
+      updateCallStatus("not_started");
     }
   };
 
@@ -205,11 +199,16 @@ const Room = () => {
         userId: socket.id,
         sessionDescription, // TODO pass this to callee
       });
-      setCallComing(false);
+      updateCallStatus("answered");
     } catch (error) {
       console.log("createAnswer() error: ", error);
+      updateCallStatus("hangup");
     }
   };
+
+  const isCalling = callStatus === "calling";
+  const isCallComing = callStatus === "call_coming";
+  const isCallStablished = callStatus === "answered";
 
   return (
     <div>
@@ -218,22 +217,24 @@ const Room = () => {
         <video ref={remoteVideoRef} id="remoteVideo" autoPlay></video>
       </div>
       <div id="controls">
-        <button
-          type="button"
-          disabled={!isRemotePeerReady}
-          onClick={handleOnCall}
-        >
-          CALL
-        </button>
+        {!isCallStablished && (
+          <button
+            type="button"
+            disabled={!isRemotePeerReady}
+            onClick={handleOnCall}
+          >
+            {isCalling ? "CALLING ..." : "CALL"}
+          </button>
+        )}
         {isCallComing && (
-          <>
-            <button type="button" onClick={handleOnAnswer}>
-              ANSWER
-            </button>
-            <button type="button" disabled>
-              HANGUP
-            </button>
-          </>
+          <button type="button" onClick={handleOnAnswer}>
+            ANSWER
+          </button>
+        )}
+        {(isCallComing || isCallStablished) && (
+          <button type="button" onClick={handleOnHangup}>
+            HANGUP
+          </button>
         )}
       </div>
       <div>
