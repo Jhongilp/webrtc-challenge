@@ -31,7 +31,6 @@ const Room = () => {
   const remoteStreamRef = useRef<any>(null);
 
   const isInitiator = useRef(false);
-  const isChannelReady = useRef(false);
   const isStarted = useRef(false);
   const pc = useRef<any>(null);
 
@@ -72,64 +71,6 @@ const Room = () => {
     }
   }, [handleIceCandidate, handleRemoteStreamAdded, handleRemoteStreamRemoved]);
 
-  const setLocalAndSendMessage = useCallback((sessionDescription: any) => {
-    // Set Opus as the preferred codec in SDP if Opus is present.
-    //  sessionDescription.sdp = preferOpus(sessionDescription.sdp);
-    pc.current.setLocalDescription(sessionDescription);
-    console.log("setLocalAndSendMessage sending message", sessionDescription);
-    sendMessage(sessionDescription);
-  }, []);
-
-  const maybeStart = useCallback(() => {
-    console.log(
-      ">>>>>>> maybeStart() ",
-      isStarted.current,
-      localStreamRef,
-      isChannelReady.current
-    );
-    if (
-      !isStarted.current &&
-      typeof localStreamRef.current &&
-      isChannelReady.current
-    ) {
-      console.log(">>>>>> creating peer connection");
-      createPeerConnection();
-      pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
-      isStarted.current = true;
-      console.log("isInitiator", isInitiator.current);
-      if (isInitiator.current) {
-        // doCall();
-      }
-    }
-    // }, [createPeerConnection, doCall]);
-  }, [createPeerConnection]);
-
-  const gotStream = useCallback(
-    (stream: any) => {
-      console.log("Adding local stream.");
-      localStreamRef.current = stream;
-      localVideoRef.current.srcObject = stream;
-      sendMessage("user_media");
-      if (isInitiator.current) {
-        maybeStart();
-      }
-    },
-    [maybeStart]
-  );
-
-  const onCreateSessionDescriptionError = (error: any) => {
-    console.log(`Failed to create session description: ${error.toString()}`);
-    // trace(`Failed to create session description: ${error.toString()}`);
-  };
-
-  const doAnswer = useCallback(() => {
-    console.log("Sending answer to peer.");
-    pc.current
-      .createAnswer()
-      .then((answer: any) => setLocalAndSendMessage(answer))
-      .catch(onCreateSessionDescriptionError);
-  }, [setLocalAndSendMessage]);
-
   const stop = () => {
     isStarted.current = false;
     pc.current.close();
@@ -161,7 +102,7 @@ const Room = () => {
       );
       setCallComing(true);
     });
-    
+
     socket.on("answer", (data) => {
       console.log("[on answer]: ", data);
       pc.current.setRemoteDescription(
@@ -187,54 +128,16 @@ const Room = () => {
       }
     });
 
-    // socket.on("created", (roomObject, socketId) => {
-    //   console.log(`Created room ${roomObject} - socketId: ${socketId}`);
-    //   isInitiator.current = true;
-    // });
 
     // socket.on("full", (roomObject) => {
     //   console.log(`Room ${roomObject} is full`);
     // });
-
-    // socket.on("join", (roomObject) => {
-    //   console.log(`Another peer made a request to join room ${roomObject}`);
-    //   console.log(`This peer is the initiator of room ${roomObject}!`);
-    //   isChannelReady.current = true;
-    // });
-
-    // socket.on("joined", (roomObject) => {
-    //   console.log(`joined: ${roomObject}`);
-    //   isChannelReady.current = true;
-    // });
-
-    // socket.on("log", (array) => {
-    //   console.log(...array);
-    // });
-
-    // socket.on("message", (message) => {
-    //   console.log("Client received message:", message);
-    //   if (message === "got user media") {
-    //     maybeStart();
-    //   } else if (message.type === "offer") {
-    //     if (!isInitiator.current && !isStarted.current) {
-    //       maybeStart();
-    //     }
-    //     pc.current.setRemoteDescription(new RTCSessionDescription(message));
-    //     doAnswer();
-    //   } else if (message.type === "answer" && isStarted) {
-    //     pc.current.setRemoteDescription(new RTCSessionDescription(message));
-    //   } else if (message.type === "candidate" && isStarted) {
-    //     const candidate = new RTCIceCandidate({
-    //       sdpMLineIndex: message.label,
-    //       candidate: message.candidate,
-    //     });
-    // TODO addIceCandidate
-    //     pc.current.addIceCandidate(candidate);
-    //   } else if (message === "bye" && isStarted) {
+    // socket.on("message", (message) => { 
+    // if (message === "bye" && isStarted) {
     //     handleRemoteHangup();
     //   }
     // });
-  }, [maybeStart, doAnswer, handleRemoteHangup]);
+  }, [handleRemoteHangup]);
 
   useEffect(() => {
     const getUserMedia = async () => {
@@ -275,14 +178,11 @@ const Room = () => {
   };
 
   const handleOnCall = async () => {
-    // createPeerConnection();
-    // pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
-    // console.log("Sending offer to peer");
     console.log("calling");
     try {
       const sessionDescription = await pc.current.createOffer([sdpConstraints]);
       pc.current.setLocalDescription(sessionDescription); // this is what triggers onicecandidate
-      // // sendMessage(sessionDescription);
+
       socket.emit("call", {
         roomId: "test-room",
         userId: socket.id,
@@ -295,15 +195,10 @@ const Room = () => {
 
   const handleOnAnswer = async () => {
     console.log("Sending answer to peer.");
-
-    // createPeerConnection();
-    // pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
-
     try {
       const sessionDescription = await pc.current.createAnswer();
-
       pc.current.setLocalDescription(sessionDescription);
-      
+
       console.log("setLocalAndSendMessage sending message", sessionDescription);
       socket.emit("answer", {
         roomId: "test-room",
@@ -311,12 +206,6 @@ const Room = () => {
         sessionDescription, // TODO pass this to callee
       });
       setCallComing(false);
-
-      // sendMessage(sessionDescription);
-      // pc.current
-      //   .createAnswer()
-      //   .then((answer: any) => setLocalAndSendMessage(answer))
-      //   .catch(onCreateSessionDescriptionError);
     } catch (error) {
       console.log("createAnswer() error: ", error);
     }
@@ -355,7 +244,3 @@ const Room = () => {
 };
 
 export default Room;
-
-/**
- * 1. get user media
- */
