@@ -127,13 +127,22 @@ const Room = () => {
   useEffect(() => {
     const getUserMedia = async () => {
       try {
+        createPeerConnection();
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream
+          .getTracks()
+          .forEach((track) => pc.current.addTrack(track, stream));
+
         console.log("[setupLocalStream] socketId: ", socket.id);
         localStreamRef.current = stream;
         localVideoRef.current.srcObject = stream;
 
-        createPeerConnection();
-        pc.current.addStream(localStreamRef.current); // TODO should I move this inside createPeerConnection()?
+        pc.current.addEventListener("connectionstatechange", (event: any) => {
+          console.log(
+            "[pc connection] on state change: ",
+            pc.current.connectionState
+          );
+        });
 
         socket.emit("user_media", {
           roomId: "test-room",
