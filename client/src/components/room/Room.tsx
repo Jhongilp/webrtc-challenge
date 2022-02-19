@@ -57,17 +57,29 @@ const Room = () => {
     }
   }, []);
 
+  const handleConnectionStateChange = useCallback((event: any) => {
+    console.log(
+      "[pc connection] on state change: ",
+      pc.current.connectionState
+    );
+  }, []);
+
   const createPeerConnection = useCallback(() => {
     try {
       pc.current = new RTCPeerConnection(pcConfig);
       pc.current.onicecandidate = handleIceCandidate;
       pc.current.onaddstream = handleRemoteStreamAdded;
+      pc.current.onconnectionstatechange = handleConnectionStateChange;
       console.log("Created RTCPeerConnnection");
     } catch (e: any) {
       console.log(`Failed to create PeerConnection, exception: ${e.message}`);
       alert("Cannot create RTCPeerConnection object.");
     }
-  }, [handleIceCandidate, handleRemoteStreamAdded]);
+  }, [
+    handleIceCandidate,
+    handleRemoteStreamAdded,
+    handleConnectionStateChange,
+  ]);
 
   useEffect(() => {
     // socket.emit("create or join", "test");
@@ -136,13 +148,6 @@ const Room = () => {
         console.log("[setupLocalStream] socketId: ", socket.id);
         localStreamRef.current = stream;
         localVideoRef.current.srcObject = stream;
-
-        pc.current.addEventListener("connectionstatechange", (event: any) => {
-          console.log(
-            "[pc connection] on state change: ",
-            pc.current.connectionState
-          );
-        });
 
         socket.emit("user_media", {
           roomId: "test-room",
