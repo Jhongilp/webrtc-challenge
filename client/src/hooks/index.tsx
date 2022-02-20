@@ -36,3 +36,31 @@ export const useFetchRoomList = () => {
 
   return fetchResult;
 };
+
+export const useGridWidth = (ref: any) => {
+  const [width, setWith] = useState(200);
+
+  useEffect(() => {
+    const padding = 80;
+    const ro = new ResizeObserver((entries) => {
+      let { width, height } = entries[0]?.contentRect ?? {};
+      if (width && height) {
+        const heightAvailable = height - padding;
+        const widthAspectRatio = heightAvailable / 0.5625; // 16/9 aspect ratio
+        const maxWidth = widthAspectRatio > width ? width : widthAspectRatio;
+        const widthMinusPadding =
+          maxWidth + padding <= width ? maxWidth : maxWidth - padding;
+        setWith(widthMinusPadding);
+      }
+    });
+
+    if (ref?.current) {
+      ro?.observe?.(ref.current);
+    }
+    return () => {
+      ro?.disconnect?.();
+    };
+  }, [ref]);
+
+  return width;
+};

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { io } from "socket.io-client";
+import { useGridWidth } from "../../hooks";
+
 const socket = io("https://localhost:8443");
 
 const pcConfig = {
@@ -63,6 +65,9 @@ const Room = () => {
   const localStreamRef = useRef<any>(null);
   const remoteStreamRef = useRef<any>(null);
   const pc = useRef<any>(null);
+
+  const wrapperRef = useRef<any>(null);
+  const width = useGridWidth(wrapperRef);
 
   const handleRemoteStreamAdded = useCallback((event: any) => {
     console.log("Remote stream added.");
@@ -319,9 +324,9 @@ const Room = () => {
   const isCallStablished = callStatus === "answered";
 
   return (
-    <div>
-      <div id="media-controls">
-        <div>
+    <div ref={wrapperRef} className="room">
+      <div className="media-controls">
+        <div className="mic-selection">
           <label htmlFor="camera-list">Camera</label>
           <select onChange={handleOnVideoDeviceSelected} id="camera-list">
             {deviceList.video.map((device) => {
@@ -333,7 +338,7 @@ const Room = () => {
             })}
           </select>
         </div>
-        <div>
+        <div className="camera-selection">
           <label htmlFor="mic-list">Mic</label>
           <select onChange={handleOnAudioDeviceSelected} id="mic-list">
             {deviceList.audio.map((device) => {
@@ -350,11 +355,23 @@ const Room = () => {
           </select>
         </div>
       </div>
-      <div id="videos">
-        <video ref={localVideoRef} id="localVideo" autoPlay muted></video>
-        <video ref={remoteVideoRef} id="remoteVideo" autoPlay></video>
+      <div className="room-videos--container" style={{ width }}>
+        <div
+          className={`local-video-wrapper ${
+            isCallStablished ? "local-p2p" : ""
+          }`}
+        >
+          <video ref={localVideoRef} id="localVideo" autoPlay muted></video>
+        </div>
+        <div
+          className={`remote-video-wrapper ${
+            isCallStablished ? "show-remote-video" : ""
+          }`}
+        >
+          <video ref={remoteVideoRef} id="remoteVideo" autoPlay></video>
+        </div>
       </div>
-      <div id="controls">
+      <div id="room-controls">
         {!isCallStablished && (
           <button
             type="button"
@@ -375,9 +392,9 @@ const Room = () => {
           </button>
         )}
       </div>
-      <div>
+      {/* <div>
         <h2>Socket id {socket.id}</h2>
-      </div>
+      </div> */}
     </div>
   );
 };
