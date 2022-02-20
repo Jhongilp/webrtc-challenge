@@ -4,14 +4,14 @@ import Room from "../room/Room";
 
 // from here user will select a room, there won't be a router since we just one to test WebRTC implementation
 const Home = () => {
-  
+
   return (
-    <div>
-      <header className="App-header">
+    <div className="home">
+      <header className="home-header">
         <h1>WebRTC MEET</h1>
         <h4>Room name when user has joined</h4>
       </header>
-      <main>
+      <main className="home-main">
         {/* <Room /> */}
         <RoomList />
       </main>

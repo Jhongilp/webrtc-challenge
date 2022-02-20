@@ -4,7 +4,7 @@ import { useFetchRoomList } from "../../hooks";
 const RoomList = () => {
   const { roomList, loading } = useFetchRoomList();
   return (
-    <div>
+    <div className="room-list">
       <h1>RoomList</h1>
       {loading ? (
         <p>Loading ...</p>
