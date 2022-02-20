@@ -1,7 +1,12 @@
 import React from "react";
 import { useFetchRoomList } from "../../hooks";
+import { TSelectedRoom } from "../../types/room.types";
 
-const RoomList = () => {
+type TRoomListProps = {
+  onSelectRoom: (input: TSelectedRoom) => void;
+};
+
+const RoomList = ({ onSelectRoom }: TRoomListProps) => {
   const { roomList, loading } = useFetchRoomList();
   return (
     <div className="room-list--wrapper">
@@ -11,7 +16,13 @@ const RoomList = () => {
       ) : (
         <ul className="room-list--items">
           {roomList.map((room) => (
-            <li className="room-item" key={room.id}>{room.name}</li>
+            <li
+              className="room-item"
+              key={room.id}
+              onClick={() => onSelectRoom({ id: room.id, name: room.name })}
+            >
+              {room.name}
+            </li>
           ))}
         </ul>
       )}

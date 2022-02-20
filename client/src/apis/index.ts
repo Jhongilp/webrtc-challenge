@@ -14,7 +14,7 @@ const data: TRoomInfo[] = [
     id: 1013,
   },
   {
-    name: "Room test 1",
+    name: "Room test 4",
     id: 1014,
   },
 ];
