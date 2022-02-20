@@ -1,3 +1,24 @@
+# WebRTC MEET APP
+
+This is a basic WebRTC application usin Node.js and React
+
+
+## Server
+
+```
+npm run dev
+```
+
+## Client
+
+To run the client we need to move to client folder and install the packages.
+```
+npm install
+// then
+npm start
+```
+
+
 # native-webrtc-peer-to-peer
 A basic native WebRTC peer to peer Web App implementation
 
