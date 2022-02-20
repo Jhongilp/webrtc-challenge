@@ -1,15 +1,10 @@
 import React from "react";
-import Room from "./components/room/Room";
+import Home from './components/home/Home'
 
 function App() {
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>WebRTC MEET</h1>
-      </header>
-      <main>
-        <Room />
-      </main>
+      <Home />
     </div>
   );
 }
