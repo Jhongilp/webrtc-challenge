@@ -21,7 +21,7 @@ const Home = () => {
         </h4>
       </header>
       <main className="home-main">
-        {selectedRoom.id ? <Room /> : <RoomList onSelectRoom={setSelectedRoom} />}
+        {selectedRoom.id ? <Room roomId={selectedRoom.id}/> : <RoomList onSelectRoom={setSelectedRoom} />}
       </main>
     </div>
   );

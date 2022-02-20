@@ -52,7 +52,7 @@ const getUpdatedStream = async ({
   return stream;
 };
 
-const Room = () => {
+const Room = ({ roomId }: { roomId: number }) => {
   const [callStatus, updateCallStatus] = useState<CALL_STATUS>("not_started");
   const [isRemotePeerReady, setRemotePeerReady] = useState(false);
   const [deviceList, setDeviceList] = useState<TEnumerateDevices>({
@@ -82,11 +82,12 @@ const Room = () => {
         label: event.candidate.sdpMLineIndex,
         id: event.candidate.sdpMid,
         candidate: event.candidate.candidate,
+        roomId
       });
     } else {
       console.log("End of candidates.");
     }
-  }, []);
+  }, [roomId]);
 
   const handleConnectionStateChange = useCallback((event: any) => {
     console.log(
@@ -121,8 +122,8 @@ const Room = () => {
     // socket.emit("create or join", "test");
 
     // TODO use join instead
-    socket.on("user_media", (data) => {
-      console.log("user_media room - data: ", data);
+    socket.on("join", (data) => {
+      console.log("joined room - data: ", data);
       setRemotePeerReady(data.userId !== socket.id);
     });
 
@@ -204,8 +205,8 @@ const Room = () => {
             console.log(err.name + ": " + err.message);
           });
 
-        socket.emit("user_media", {
-          roomId: "test-room",
+        socket.emit("join", {
+          roomId,
           userId: socket.id,
         });
       } catch (error) {
@@ -214,17 +215,17 @@ const Room = () => {
       }
     };
     getUserMedia();
-  }, [createPeerConnection]);
+  }, [createPeerConnection, roomId]);
 
   const handleOnHangup = useCallback(() => {
     sendMessage({
       type: "hangup",
-      roomId: "test-room",
+      roomId,
       userId: socket.id,
     });
     pc.current.close();
     pc.current = null;
-  }, []);
+  }, [roomId]);
 
   useEffect(() => {
     window.addEventListener("beforeunload", handleOnHangup);
@@ -246,7 +247,7 @@ const Room = () => {
       pc.current.setLocalDescription(sessionDescription); // this is what triggers onicecandidate
 
       socket.emit("call", {
-        roomId: "test-room",
+        roomId,
         userId: socket.id,
         sessionDescription, // TODO pass this to callee
       });
@@ -264,7 +265,7 @@ const Room = () => {
 
       console.log("setLocalAndSendMessage sending message", sessionDescription);
       socket.emit("answer", {
-        roomId: "test-room",
+        roomId,
         userId: socket.id,
         sessionDescription, // TODO pass this to callee
       });

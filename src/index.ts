@@ -44,24 +44,17 @@ const socketSignalingServer = (
       d.info(array);
     };
 
-    socket.on("message", (message: string) => {
+    socket.on("message", (message: any) => {
       log("Client said: ", message);
-      // To support multiple rooms in app, would be room-only (not broadcast)
-      socket.broadcast.emit("message", message);
+      socket.to(message.roomId).emit("message", message);
     });
 
-    socket.on("user_media", (data: { roomId: string; userId: string }) => {
-      // To support multiple rooms in app, would be room-only (not broadcast)
-      // socket.broadcast.emit("user_media", userSocketId);
+    socket.on("join", (data: { roomId: string; userId: string }) => {
       socket.join(data.roomId);
-      io.sockets.in(data.roomId).emit("user_media", data);
+      io.sockets.in(data.roomId).emit("join", data);
     });
 
     socket.on("call", (data: { roomId: string; userId: string }) => {
-      // To support multiple rooms in app, would be room-only (not broadcast)
-      // socket.broadcast.emit("user_media", userSocketId);
-      // socket.join(data.roomId);
-      // io.sockets.in(data.roomId).emit("call", data);
       socket.to(data.roomId).emit("call", data);
     });
 
@@ -69,33 +62,33 @@ const socketSignalingServer = (
       socket.to(data.roomId).emit("answer", data);
     });
 
-    socket.on("create or join", (room: string) => {
-      log(`Received request to create or join room ${room}`);
+    // socket.on("create or join", (room: string) => {
+    //   log(`Received request to create or join room ${room}`);
 
-      const clients = io.sockets.adapter.rooms.get(room);
-      const numClients = clients ? clients.size : 0;
+    //   const clients = io.sockets.adapter.rooms.get(room);
+    //   const numClients = clients ? clients.size : 0;
 
-      log(`Room ${room} now has ${numClients} client(s)`);
+    //   log(`Room ${room} now has ${numClients} client(s)`);
 
-      if (numClients === 0) {
-        socket.join(room);
-        log(`Client ID ${socket.id} created room ${room}`);
-        socket.emit("created", room, socket.id);
-      } else if (numClients === 1) {
-        log(`Client ID ${socket.id} joined room ${room}`);
-        io.sockets.in(room).emit("join", room);
-        socket.join(room);
-        socket.emit("joined", room, socket.id);
-        io.sockets.in(room).emit("ready");
-      } else {
-        // max two clients
-        socket.emit("full", room);
-      }
+    //   if (numClients === 0) {
+    //     socket.join(room);
+    //     log(`Client ID ${socket.id} created room ${room}`);
+    //     socket.emit("created", room, socket.id);
+    //   } else if (numClients === 1) {
+    //     log(`Client ID ${socket.id} joined room ${room}`);
+    //     io.sockets.in(room).emit("join", room);
+    //     socket.join(room);
+    //     socket.emit("joined", room, socket.id);
+    //     io.sockets.in(room).emit("ready");
+    //   } else {
+    //     // max two clients
+    //     socket.emit("full", room);
+    //   }
 
-      socket.on("disconnect", () => {
-        log(`Client ID ${socket.id} disconnected.`);
-      });
-    });
+    //   socket.on("disconnect", () => {
+    //     log(`Client ID ${socket.id} disconnected.`);
+    //   });
+    // });
   });
 };
 
