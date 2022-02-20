@@ -111,7 +111,7 @@ li.room-item:hover {
 
 .mic-selection {
   display: flex;
-  /* width: 40%; */
+  margin-right: 20px;
 }
 
 .mic-selection > label {
