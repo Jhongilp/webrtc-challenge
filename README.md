@@ -24,7 +24,7 @@ WebRTC is a combination of protocols that allow Real Time Communication in the b
 
 ## UDP, WebSockets and WebRTC
 
-We can use WebSockets in the initial signaling stage. In this initial stage, we just stablish a connection between the users. It will be used as a medium to share the data needed to stablish a WebRTC connection. Once WebRTC is stablished, it transports its data over UDP.
+We can use WebSockets in the initial signaling stage. In this initial stage, we just establish a connection between the users. It will be used as a medium to share the data needed to establish a WebRTC connection. Once WebRTC is established, it transports its data over UDP.
 
 ## WebRTC steps
 
@@ -42,8 +42,8 @@ We can use WebSockets in the initial signaling stage. In this initial stage, we 
   SDP contains the codec, source address, and timing information of audio and video. See [Anatomy of a WebRTC SDP](https://webrtchacks.com/sdp-anatomy/ "Anatomy of a WebRTC SDP").
 
 - ### ICE: Interactive Connectivity Establishment
-  Stablishing a connection between two peers is not as easier as regular server/client architecture. Since WebRTC is about peer-to-peer (p2p) connection, there are some network challenges, mostly because the public IP that is required to make the p2p connection is not always available due to NAT routers.
-  ICE is a mechanism that used along with STUN and TURN servers allows to stablish a connection.
+  Establishing a connection between two peers is not as easier as regular server/client architecture. Since WebRTC is about peer-to-peer (p2p) connection, there are some network challenges, mostly because the public IP that is required to make the p2p connection is not always available due to NAT routers.
+  ICE is a mechanism that used along with STUN and TURN servers allows to establish a connection.
 
 ICE Candidate Types:
 
